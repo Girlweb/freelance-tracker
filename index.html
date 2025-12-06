@@ -7,10 +7,13 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">☀️</span>
+    </button>
     <!-- Sidebar Navigation -->
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2>💼 FreelancePay</h2>
+            <h2> FreelancePay</h2>
             <button class="close-btn" onclick="toggleSidebar()">✕</button>
         </div>
         <ul class="nav-menu">
@@ -20,205 +23,225 @@
             <li><a href="#" onclick="showPage('reports')" class="nav-link">→ Reports</a></li>
             <li><a href="#" onclick="showPage('support')" class="nav-link">→ Support</a></li>
         </ul>
+        <div class="sidebar-footer">
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
     </nav>
 
-    <!-- Main Content Area -->
     <div class="main-content">
-        <!-- Top Bar -->
         <header class="topbar">
             <button class="menu-btn" onclick="toggleSidebar()">☰</button>
             <h1>FreelancePay Tracker</h1>
             <div class="user-info">
-                <span>Welcome, Freelancer!</span>
+                <span id="user-name">Welcome!</span>
             </div>
         </header>
 
-        <!-- HOME PAGE -->
-        <div id="home-page" class="page active">
-            <section class="welcome-section">
-                <h2>Welcome Back!</h2>
-                <p>Here's what's happening with your business today</p>
-            </section>
+        <!-- Login Page -->
+        <div id="login-page" class="auth-page">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h1>💼 FreelancePay Tracker</h1>
+                    <p>Track your clients, invoices, and payments</p>
+                </div>
+                <div class="auth-form-container">
+                    <h2>Login to Your Account</h2>
+                    <form id="login-form" onsubmit="handleLogin(event); return false;">
+                        <input type="email" id="login-email" placeholder="Email" required autocomplete="email">
+                        <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
+                        <div id="login-error" class="error-message"></div>
+                        <button type="submit" class="auth-btn">Login</button>
+                    </form>
+                    <p class="auth-switch">
+                        Don't have an account? 
+                        <a href="#" onclick="showAuthPage('register')">Register here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
 
-            <!-- Quick Stats -->
-            <section class="dashboard">
-                <div class="stats-grid">
+        <!-- Register Page -->
+        <div id="register-page" class="auth-page" style="display: none;">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h1>💼 FreelancePay Tracker</h1>
+                    <p>Create your free account</p>
+                </div>
+                <div class="auth-form-container">
+                    <h2>Create New Account</h2>
+                    <form id="register-form" onsubmit="handleRegister(event); return false;">
+                        <input type="text" id="register-name" placeholder="Full Name" required autocomplete="name">
+                        <input type="email" id="register-email" placeholder="Email" required autocomplete="email">
+                        <input type="password" id="register-password" placeholder="Password (min 6 characters)" required minlength="6" autocomplete="new-password">
+                        <div id="register-error" class="error-message"></div>
+                        <button type="submit" class="auth-btn">Create Account</button>
+                    </form>
+                    <p class="auth-switch">
+                        Already have an account? 
+                        <a href="#" onclick="showAuthPage('login')">Login here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App (shown only when logged in) -->
+        <div id="app-container" style="display: none;">
+            
+            <div id="home-page" class="page active">
+                <section class="welcome-section">
+                    <h2>Welcome Back!</h2>
+                    <p>Here's what's happening with your business today</p>
+                </section>
+                <section class="dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Total Clients</h3>
+                            <p class="stat-number" id="home-total-clients">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total Invoices</h3>
+                            <p class="stat-number" id="home-total-invoices">0</p>
+                        </div>
+                        <div class="stat-card success">
+                            <h3>Paid</h3>
+                            <p class="stat-number" id="home-paid-total">KSh 0</p>
+                        </div>
+                        <div class="stat-card warning">
+                            <h3>Pending</h3>
+                            <p class="stat-number" id="home-unpaid-total">KSh 0</p>
+                        </div>
+                    </div>
+                </section>
+                <section class="quick-actions">
+                    <h2>Quick Actions</h2>
+                    <div class="action-buttons">
+                        <button onclick="showPage('invoices')" class="action-btn primary">Create Invoice →</button>
+                        <button onclick="showPage('clients')" class="action-btn secondary">Add Client →</button>
+                    </div>
+                </section>
+                <section class="recent-activity">
+                    <h2>Recent Invoices</h2>
+                    <div id="recent-invoices-list" class="activity-list"></div>
+                </section>
+            </div>
+
+            <div id="clients-page" class="page">
+                <section class="page-header">
+                    <h2>Manage Clients</h2>
+                    <p>Add, view, and manage all your clients</p>
+                </section>
+                <div class="form-container">
+                    <h3>Add New Client</h3>
+                    <form id="client-form" onsubmit="addClient(event); return false;">
+                        <input type="text" id="client-name" placeholder="Client Name" required>
+                        <input type="email" id="client-email" placeholder="Email" required>
+                        <input type="tel" id="client-phone" placeholder="Phone (optional)">
+                        <button type="submit">Add Client</button>
+                    </form>
+                </div>
+                <div class="table-container">
+                    <table id="clients-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Added</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clients-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="invoices-page" class="page">
+                <section class="page-header">
+                    <h2>Manage Invoices</h2>
+                    <p>Create and track all your invoices</p>
+                </section>
+                <div class="form-container">
+                    <h3>Create New Invoice</h3>
+                    <form id="invoice-form" onsubmit="addInvoice(event); return false;">
+                        <select id="invoice-client" required>
+                            <option value="">Select Client</option>
+                        </select>
+                        <input type="number" id="invoice-amount" placeholder="Amount (KSh)" step="0.01" required>
+                        <select id="invoice-description" required>
+                            <option value="">Select service type...</option>
+                            <option value="Website Development">Website Development</option>
+                            <option value="Mobile App Development">Mobile App Development</option>
+                            <option value="Logo Design">Logo Design</option>
+                            <option value="UI/UX Design">UI/UX Design</option>
+                            <option value="Graphic Design">Graphic Design</option>
+                            <option value="Content Writing">Content Writing</option>
+                            <option value="SEO Services">SEO Services</option>
+                            <option value="Social Media Management">Social Media Management</option>
+                            <option value="Consulting">Consulting</option>
+                            <option value="Photography">Photography</option>
+                            <option value="Video Editing">Video Editing</option>
+                            <option value="Database Setup">Database Setup</option>
+                            <option value="API Integration">API Integration</option>
+                            <option value="Bug Fixes">Bug Fixes</option>
+                            <option value="Monthly Retainer">Monthly Retainer</option>
+                            <option value="Custom">Custom (type below)</option>
+                        </select>
+                        <input type="text" id="invoice-description-custom" placeholder="Enter custom description" style="display: none;">
+                        <input type="date" id="invoice-due-date" required>
+                        <button type="submit">Create Invoice</button>
+                    </form>
+                </div>
+                <div id="invoices-list" class="list-container"></div>
+            </div>
+
+            <div id="reports-page" class="page">
+                <section class="page-header">
+                    <h2>Financial Reports</h2>
+                    <p>Track your income and business performance</p>
+                </section>
+                <div class="reports-container">
                     <div class="stat-card">
-                        <h3>Total Clients</h3>
-                        <p class="stat-number" id="home-total-clients">0</p>
+                        <h3>This Month's Revenue</h3>
+                        <p class="stat-number" id="month-revenue">KSh 0</p>
                     </div>
                     <div class="stat-card">
-                        <h3>Total Invoices</h3>
-                        <p class="stat-number" id="home-total-invoices">0</p>
+                        <h3>Average Invoice Value</h3>
+                        <p class="stat-number" id="avg-invoice">KSh 0</p>
                     </div>
-                    <div class="stat-card success">
-                        <h3>Paid</h3>
-                        <p class="stat-number" id="home-paid-total">KSh 0</p>
+                    <p class="coming-soon">Advanced charts and reports coming soon!</p>
+                </div>
+            </div>
+
+            <div id="support-page" class="page">
+                <section class="page-header">
+                    <h2>Support & Help</h2>
+                    <p>Get help with FreelancePay Tracker</p>
+                </section>
+                <div class="support-container">
+                    <div class="support-card">
+                        <h3>Documentation</h3>
+                        <p>Learn how to use FreelancePay Tracker effectively</p>
+                        <ul>
+                            <li>Getting Started Guide</li>
+                            <li>Managing Clients</li>
+                            <li>Creating Invoices</li>
+                            <li>Payment Tracking</li>
+                        </ul>
                     </div>
-                    <div class="stat-card warning">
-                        <h3>Pending</h3>
-                        <p class="stat-number" id="home-unpaid-total">KSh 0</p>
+                    <div class="support-card">
+                        <h3>Contact Support</h3>
+                        <p>Need help? Reach out to our support team</p>
+                        <p><strong>Email:</strong> support@freelancepay.com</p>
+                        <p><strong>Response Time:</strong> Within 24 hours</p>
+                    </div>
+                    <div class="support-card">
+                        <h3>Feature Requests</h3>
+                        <p>Have an idea? We'd love to hear it!</p>
+                        <p>Submit your suggestions to help us improve FreelancePay Tracker</p>
                     </div>
                 </div>
-            </section>
-
-            <!-- Quick Actions -->
-            <section class="quick-actions">
-                <h2>Quick Actions</h2>
-                <div class="action-buttons">
-                    <button onclick="showPage('invoices')" class="action-btn primary">
-                        Create Invoice →
-                    </button>
-                    <button onclick="showPage('clients')" class="action-btn secondary">
-                        Add Client →
-                    </button>
-                </div>
-            </section>
-
-            <!-- Recent Activity -->
-            <section class="recent-activity">
-                <h2>Recent Invoices</h2>
-                <div id="recent-invoices-list" class="activity-list">
-                    <!-- Populated by JavaScript -->
-                </div>
-            </section>
-        </div>
-
-        <!-- CLIENTS PAGE -->
-        <div id="clients-page" class="page">
-            <section class="page-header">
-                <h2>Manage Clients</h2>
-                <p>Add, view, and manage all your clients</p>
-            </section>
-
-            <!-- Add Client Form -->
-            <div class="form-container">
-                <h3>Add New Client</h3>
-                <form id="client-form" onsubmit="addClient(event); return false;">
-                    <input type="text" id="client-name" placeholder="Client Name" required>
-                    <input type="email" id="client-email" placeholder="Email" required>
-                    <input type="tel" id="client-phone" placeholder="Phone (optional)">
-                    <button type="submit">Add Client</button>
-                </form>
             </div>
 
-            <!-- Clients Table -->
-            <div class="table-container">
-                <table id="clients-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Added</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="clients-table-body">
-                        <!-- Populated by JavaScript -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- INVOICES PAGE -->
-        <div id="invoices-page" class="page">
-            <section class="page-header">
-                <h2>Manage Invoices</h2>
-                <p>Create and track all your invoices</p>
-            </section>
-
-            <!-- Create Invoice Form -->
-            <div class="form-container">
-                <h3>Create New Invoice</h3>
-                <form id="invoice-form" onsubmit="addInvoice(event); return false;">
-                    <select id="invoice-client" required>
-                        <option value="">Select Client</option>
-                    </select>
-                    <input type="number" id="invoice-amount" placeholder="Amount (KSh)" step="0.01" required>
-                    <select id="invoice-description" required>
-                        <option value="">Select service type...</option>
-                        <option value="Website Development">Website Development</option>
-                        <option value="Mobile App Development">Mobile App Development</option>
-                        <option value="Logo Design">Logo Design</option>
-                        <option value="UI/UX Design">UI/UX Design</option>
-                        <option value="Graphic Design">Graphic Design</option>
-                        <option value="Content Writing">Content Writing</option>
-                        <option value="SEO Services">SEO Services</option>
-                        <option value="Social Media Management">Social Media Management</option>
-                        <option value="Consulting">Consulting</option>
-                        <option value="Photography">Photography</option>
-                        <option value="Video Editing">Video Editing</option>
-                        <option value="Database Setup">Database Setup</option>
-                        <option value="API Integration">API Integration</option>
-                        <option value="Bug Fixes">Bug Fixes</option>
-                        <option value="Monthly Retainer">Monthly Retainer</option>
-                        <option value="Custom">Custom (type below)</option>
-                    </select>
-                    <input type="text" id="invoice-description-custom" placeholder="Enter custom description" style="display: none;">
-                    <input type="date" id="invoice-due-date" required>
-                    <button type="submit">Create Invoice</button>
-                </form>
-            </div>
-
-            <!-- Invoices List -->
-            <div id="invoices-list" class="list-container">
-                <!-- Populated by JavaScript -->
-            </div>
-        </div>
-
-        <!-- REPORTS PAGE -->
-        <div id="reports-page" class="page">
-            <section class="page-header">
-                <h2>Financial Reports</h2>
-                <p>Track your income and business performance</p>
-            </section>
-
-            <div class="reports-container">
-                <div class="stat-card">
-                    <h3>This Month's Revenue</h3>
-                    <p class="stat-number" id="month-revenue">KSh 0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Average Invoice Value</h3>
-                    <p class="stat-number" id="avg-invoice">KSh 0</p>
-                </div>
-                <p class="coming-soon">Advanced charts and reports coming soon!</p>
-            </div>
-        </div>
-
-        <!-- SUPPORT PAGE -->
-        <div id="support-page" class="page">
-            <section class="page-header">
-                <h2>Support & Help</h2>
-                <p>Get help with FreelancePay Tracker</p>
-            </section>
-
-            <div class="support-container">
-                <div class="support-card">
-                    <h3>Documentation</h3>
-                    <p>Learn how to use FreelancePay Tracker effectively</p>
-                    <ul>
-                        <li>Getting Started Guide</li>
-                        <li>Managing Clients</li>
-                        <li>Creating Invoices</li>
-                        <li>Payment Tracking</li>
-                    </ul>
-                </div>
-
-                <div class="support-card">
-                    <h3>Contact Support</h3>
-                    <p>Need help? Reach out to our support team</p>
-                    <p><strong>Email:</strong> support@freelancepay.com</p>
-                    <p><strong>Response Time:</strong> Within 24 hours</p>
-                </div>
-
-                <div class="support-card">
-                    <h3>Feature Requests</h3>
-                    <p>Have an idea? We'd love to hear it!</p>
-                    <p>Submit your suggestions to help us improve FreelancePay Tracker</p>
-                </div>
-            </div>
         </div>
     </div>
 

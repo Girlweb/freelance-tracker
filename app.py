@@ -1,24 +1,149 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from models import get_db, init_db
+from models import get_db, init_db, create_user, get_user_by_email, get_user_by_id, verify_password
+from datetime import timedelta
 
 app = Flask(__name__)
-CORS(app)
+
+# Session configuration - change SECRET_KEY in production
+app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
+# Enable CORS with session support
+CORS(app, supports_credentials=True, origins=['http://localhost:8000'])
+
 init_db()
 
 
+# ============ AUTHENTICATION ROUTES ============
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    """Create new user account"""
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    name = data.get('name')
+    
+    # Validate required fields
+    if not email or not password or not name:
+        return jsonify({'error': 'Email, password, and name are required'}), 400
+    
+    # Basic validation
+    if '@' not in email:
+        return jsonify({'error': 'Invalid email address'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    
+    # Attempt to create user
+    user_id = create_user(email, password, name)
+    
+    if user_id is None:
+        return jsonify({'error': 'Email already registered'}), 400
+    
+    # Auto-login after registration
+    session['user_id'] = user_id
+    session.permanent = True
+    
+    return jsonify({
+        'message': 'Registration successful',
+        'user_id': user_id
+    }), 201
+
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """Authenticate user and create session"""
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    
+    if not email or not password:
+        return jsonify({'error': 'Email and password are required'}), 400
+    
+    # Find user by email
+    user = get_user_by_email(email)
+    
+    if not user or not verify_password(user['password'], password):
+        # Don't reveal whether email exists (security best practice)
+        return jsonify({'error': 'Invalid email or password'}), 401
+    
+    # Create session
+    session['user_id'] = user['id']
+    session.permanent = True
+    
+    return jsonify({
+        'message': 'Login successful',
+        'user': {
+            'id': user['id'],
+            'email': user['email'],
+            'name': user['name']
+        }
+    }), 200
+
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Clear user session"""
+    session.pop('user_id', None)
+    return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@app.route('/api/me', methods=['GET'])
+def get_current_user():
+    """Get current logged-in user information"""
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user = get_user_by_id(user_id)
+    
+    if not user:
+        session.pop('user_id', None)
+        return jsonify({'error': 'User not found'}), 401
+    
+    return jsonify({
+        'id': user['id'],
+        'email': user['email'],
+        'name': user['name']
+    }), 200
+
+
+# ============ HELPER FUNCTION ============
+
+def get_current_user_id():
+    """Get current logged-in user ID from session"""
+    return session.get('user_id')
+
+
+# ============ CLIENT ROUTES ============
+
 @app.route('/api/clients', methods=['GET'])
 def get_clients():
-    """Returns all clients from database."""
+    """Get all clients for current user"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     conn = get_db()
-    clients = conn.execute('SELECT * FROM clients ORDER BY created_at DESC').fetchall()
+    clients = conn.execute(
+        'SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC',
+        (user_id,)
+    ).fetchall()
     conn.close()
+    
     return jsonify([dict(client) for client in clients])
 
 
 @app.route('/api/clients', methods=['POST'])
 def create_client():
-    """Creates a new client."""
+    """Create new client for current user"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     data = request.get_json()
     name = data.get('name')
     email = data.get('email')
@@ -29,8 +154,8 @@ def create_client():
     
     conn = get_db()
     cursor = conn.execute(
-        'INSERT INTO clients (name, email, phone) VALUES (?, ?, ?)',
-        (name, email, phone)
+        'INSERT INTO clients (user_id, name, email, phone) VALUES (?, ?, ?, ?)',
+        (user_id, name, email, phone)
     )
     conn.commit()
     client_id = cursor.lastrowid
@@ -41,34 +166,66 @@ def create_client():
 
 @app.route('/api/clients/<int:client_id>', methods=['DELETE'])
 def delete_client(client_id):
-    """Deletes a client and their invoices."""
+    """Delete client (authorization check)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     conn = get_db()
+    
+    # Verify client belongs to current user
+    client = conn.execute(
+        'SELECT * FROM clients WHERE id = ? AND user_id = ?',
+        (client_id, user_id)
+    ).fetchone()
+    
+    if not client:
+        conn.close()
+        return jsonify({'error': 'Client not found or unauthorized'}), 404
+    
+    # Delete client and associated invoices (CASCADE)
     conn.execute('DELETE FROM clients WHERE id = ?', (client_id,))
     conn.execute('DELETE FROM invoices WHERE client_id = ?', (client_id,))
     conn.commit()
     conn.close()
+    
     return jsonify({'message': 'Client deleted successfully'})
 
 
+# ============ INVOICE ROUTES ============
+
 @app.route('/api/invoices', methods=['GET'])
 def get_invoices():
-    """Returns all invoices with client details."""
+    """Get all invoices for current user's clients"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     conn = get_db()
+    
+    # Join to ensure only user's invoices are returned
     invoices = conn.execute('''
         SELECT 
             invoices.*,
             clients.name as client_name
         FROM invoices
         JOIN clients ON invoices.client_id = clients.id
+        WHERE clients.user_id = ?
         ORDER BY invoices.created_at DESC
-    ''').fetchall()
+    ''', (user_id,)).fetchall()
+    
     conn.close()
+    
     return jsonify([dict(invoice) for invoice in invoices])
 
 
 @app.route('/api/invoices', methods=['POST'])
 def create_invoice():
-    """Creates a new invoice."""
+    """Create new invoice (with authorization check)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     data = request.get_json()
     client_id = data.get('client_id')
     amount = data.get('amount')
@@ -79,6 +236,17 @@ def create_invoice():
         return jsonify({'error': 'Client ID and amount are required'}), 400
     
     conn = get_db()
+    
+    # Verify client belongs to current user
+    client = conn.execute(
+        'SELECT * FROM clients WHERE id = ? AND user_id = ?',
+        (client_id, user_id)
+    ).fetchone()
+    
+    if not client:
+        conn.close()
+        return jsonify({'error': 'Client not found or unauthorized'}), 404
+    
     cursor = conn.execute(
         'INSERT INTO invoices (client_id, amount, description, due_date) VALUES (?, ?, ?, ?)',
         (client_id, amount, description, due_date)
@@ -92,7 +260,11 @@ def create_invoice():
 
 @app.route('/api/invoices/<int:invoice_id>/status', methods=['PUT'])
 def update_invoice_status(invoice_id):
-    """Updates invoice payment status."""
+    """Update invoice status (with authorization check)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     data = request.get_json()
     status = data.get('status')
     
@@ -100,6 +272,18 @@ def update_invoice_status(invoice_id):
         return jsonify({'error': 'Status must be paid or unpaid'}), 400
     
     conn = get_db()
+    
+    # Verify invoice belongs to user's client
+    invoice = conn.execute('''
+        SELECT invoices.* FROM invoices
+        JOIN clients ON invoices.client_id = clients.id
+        WHERE invoices.id = ? AND clients.user_id = ?
+    ''', (invoice_id, user_id)).fetchone()
+    
+    if not invoice:
+        conn.close()
+        return jsonify({'error': 'Invoice not found or unauthorized'}), 404
+    
     conn.execute('UPDATE invoices SET status = ? WHERE id = ?', (status, invoice_id))
     conn.commit()
     conn.close()
@@ -109,23 +293,65 @@ def update_invoice_status(invoice_id):
 
 @app.route('/api/invoices/<int:invoice_id>', methods=['DELETE'])
 def delete_invoice(invoice_id):
-    """Deletes an invoice."""
+    """Delete invoice (with authorization check)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     conn = get_db()
+    
+    # Verify invoice belongs to user's client
+    invoice = conn.execute('''
+        SELECT invoices.* FROM invoices
+        JOIN clients ON invoices.client_id = clients.id
+        WHERE invoices.id = ? AND clients.user_id = ?
+    ''', (invoice_id, user_id)).fetchone()
+    
+    if not invoice:
+        conn.close()
+        return jsonify({'error': 'Invoice not found or unauthorized'}), 404
+    
     conn.execute('DELETE FROM invoices WHERE id = ?', (invoice_id,))
     conn.commit()
     conn.close()
+    
     return jsonify({'message': 'Invoice deleted successfully'})
 
 
+# ============ STATS ROUTE ============
+
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    """Returns dashboard statistics."""
+    """Get statistics for current user"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
     conn = get_db()
     
-    total_clients = conn.execute('SELECT COUNT(*) as count FROM clients').fetchone()['count']
-    total_invoices = conn.execute('SELECT COUNT(*) as count FROM invoices').fetchone()['count']
-    paid_total = conn.execute("SELECT SUM(amount) as total FROM invoices WHERE status = 'paid'").fetchone()['total'] or 0
-    unpaid_total = conn.execute("SELECT SUM(amount) as total FROM invoices WHERE status = 'unpaid'").fetchone()['total'] or 0
+    # Get stats scoped to current user
+    total_clients = conn.execute(
+        'SELECT COUNT(*) as count FROM clients WHERE user_id = ?',
+        (user_id,)
+    ).fetchone()['count']
+    
+    total_invoices = conn.execute('''
+        SELECT COUNT(*) as count FROM invoices
+        JOIN clients ON invoices.client_id = clients.id
+        WHERE clients.user_id = ?
+    ''', (user_id,)).fetchone()['count']
+    
+    paid_total = conn.execute('''
+        SELECT SUM(amount) as total FROM invoices
+        JOIN clients ON invoices.client_id = clients.id
+        WHERE clients.user_id = ? AND invoices.status = 'paid'
+    ''', (user_id,)).fetchone()['total'] or 0
+    
+    unpaid_total = conn.execute('''
+        SELECT SUM(amount) as total FROM invoices
+        JOIN clients ON invoices.client_id = clients.id
+        WHERE clients.user_id = ? AND invoices.status = 'unpaid'
+    ''', (user_id,)).fetchone()['total'] or 0
     
     conn.close()
     
