@@ -1,8 +1,8 @@
-#  FreelancePay Tracker
+# 💼 FreelancePay Tracker
 
 A full-stack web application for freelancers to manage clients, invoices, and payments. Built with Flask (Python) backend and vanilla JavaScript frontend.
 
-![FreelancePay Tracker](https://img.shields.io/badge/Status-Active-success)
+![FreelancePay Tracker](https://img.shields.io/badge/Status-Live-success)
 ![Python](https://img.shields.io/badge/Python-3.8+-blue)
 ![Flask](https://img.shields.io/badge/Flask-3.0-lightgrey)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -11,9 +11,9 @@ A full-stack web application for freelancers to manage clients, invoices, and pa
 
 ### Core Functionality
 - **User Authentication** - Secure registration and login system with password hashing
-- **Client Management** - Add, view, and delete clients with contact information
-- **Invoice Tracking** - Create and manage invoices with customizable descriptions
-- **Payment Status** - Track paid and unpaid invoices
+- **Client Management** - Add, edit, delete, and search clients with contact information
+- **Invoice Tracking** - Create, edit, and manage invoices with customizable descriptions
+- **Payment Status** - Track paid and unpaid invoices with status filtering
 - **Dashboard Analytics** - Real-time statistics showing revenue and business metrics
 - **Multi-page Interface** - Clean navigation between Home, Clients, Invoices, Reports, and Support
 
@@ -23,34 +23,26 @@ A full-stack web application for freelancers to manage clients, invoices, and pa
 - **Data Isolation** - Users can only access their own data
 - **Responsive Design** - Works on desktop, tablet, and mobile devices
 - **Dark/Light Theme** - Toggle between dark and light modes
+- **Search & Filter** - Real-time client search and invoice status filtering
+- **Edit Functionality** - Update client and invoice information with modal dialogs
 - **Form Validation** - Client-side and server-side input validation
 - **Automated Testing** - Comprehensive test suite with 16+ tests
 
 ##  Live Demo
 
-**[View Live Demo](#)** *(Add your deployed URL here)*
+**Frontend:** https://freelance-tracker-qayl.vercel.app/  
+**Backend API:** https://freelance-tracker-api.onrender.com/
 
-##  Screenshots
+> **Note:** The free Render instance may take 50+ seconds to wake up on first request after inactivity.
 
-### Login Page
-![Login](screenshots/login.png)
-
-### Dashboard
-![Dashboard](screenshots/dashboard.png)
-
-### Client Management
-![Clients](screenshots/clients.png)
-
-### Invoice Tracking
-![Invoices](screenshots/invoices.png)
-
-## Tech Stack
+##  Tech Stack
 
 ### Backend
 - **Python 3.8+** - Core programming language
 - **Flask 3.0** - Web framework
 - **SQLite** - Database
 - **Flask-CORS** - Cross-origin resource sharing
+- **Gunicorn** - Production WSGI server
 
 ### Frontend
 - **HTML5** - Structure
@@ -58,19 +50,23 @@ A full-stack web application for freelancers to manage clients, invoices, and pa
 - **Vanilla JavaScript** - No frameworks, pure JavaScript
 - **Responsive Design** - Mobile-first approach
 
+### Deployment
+- **Backend:** Render.com (Free tier)
+- **Frontend:** Vercel (Free tier)
+
 ### Testing
 - **unittest** - Python's built-in testing framework
 - **16 Test Cases** - Covering authentication, CRUD operations, and data isolation
 
 ##  Prerequisites
 
-Before running this project, make sure you have:
+Before running this project locally, make sure you have:
 
 - Python 3.8 or higher
 - pip (Python package manager)
 - A modern web browser (Chrome, Firefox, Safari, Edge)
 
-##  Installation
+## 🔧 Local Installation
 
 ### 1. Clone the Repository
 
@@ -128,7 +124,7 @@ Failures: 0
 Errors: 0
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 freelance-tracker/
@@ -139,18 +135,21 @@ freelance-tracker/
 ├── app.js                 # Frontend JavaScript
 ├── styles.css             # Frontend styling
 ├── requirements.txt       # Python dependencies
+├── Procfile               # Render deployment config
+├── vercel.json           # Vercel deployment config
 ├── .gitignore            # Git ignore file
 ├── README.md             # This file
 └── freelance.db          # SQLite database (created on first run)
 ```
 
-## 🔐 Security Features
+##  Security Features
 
 - **Password Hashing** - SHA-256 hashing for password storage
 - **Session Management** - Secure Flask sessions with secret keys
 - **SQL Injection Prevention** - Parameterized queries
 - **Authorization Checks** - Users can only access their own data
 - **Input Validation** - Both client-side and server-side validation
+- **CORS Configuration** - Properly configured cross-origin requests
 
 ##  Design Philosophy
 
@@ -171,35 +170,51 @@ freelance-tracker/
 ### Clients
 - `GET /api/clients` - Get all clients for logged-in user
 - `POST /api/clients` - Create new client
+- `PUT /api/clients/:id` - Update client information
 - `DELETE /api/clients/:id` - Delete client
 
 ### Invoices
 - `GET /api/invoices` - Get all invoices
 - `POST /api/invoices` - Create new invoice
-- `PUT /api/invoices/:id/status` - Update invoice status
+- `PUT /api/invoices/:id` - Update invoice information
+- `PUT /api/invoices/:id/status` - Update invoice payment status
 - `DELETE /api/invoices/:id` - Delete invoice
 
 ### Statistics
 - `GET /api/stats` - Get dashboard statistics
 
-##  Deployment
+##  Deployment Guide
 
-### Deploy to Render.com (Free)
+### Backend Deployment (Render.com)
 
-1. Create account on [Render.com](https://render.com)
-2. Connect your GitHub repository
-3. Create a new Web Service
-4. Set build command: `pip install -r requirements.txt`
-5. Set start command: `gunicorn app:app`
-6. Deploy!
+1. **Create account on [Render.com](https://render.com)**
+2. **Connect GitHub repository**
+3. **Create new Web Service with these settings:**
+   ```
+   Name: freelance-tracker-api
+   Runtime: Python 3
+   Build Command: pip install -r requirements.txt
+   Start Command: gunicorn app:app
+   Instance Type: Free
+   ```
+4. **Add Environment Variables:**
+   ```
+   SECRET_KEY=your-random-secret-key-here
+   FRONTEND_URL=https://your-frontend-url.vercel.app
+   ```
+5. **Deploy!**
 
-### Deploy Frontend
+### Frontend Deployment (Vercel)
 
-1. Use Vercel or Netlify for frontend
-2. Update `API_URL` in `app.js` to your Render backend URL
-3. Deploy static files
+1. **Go to [Vercel.com](https://vercel.com)**
+2. **Import GitHub repository**
+3. **Deploy** (Vercel auto-detects static site)
+4. **Update app.js** with your Render backend URL:
+   ```javascript
+   const API_URL = 'https://freelance-tracker-api.onrender.com/api';
+   ```
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -219,24 +234,25 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [ ] Recurring invoices
 - [ ] Payment gateway integration
 - [ ] Mobile app (React Native)
+- [ ] Theme preference persistence (localStorage)
+- [ ] Password recovery feature
 
 ##  Known Issues
 
-- Theme preference not persisted across sessions (localStorage coming soon)
+- Free Render instance spins down after inactivity (50+ second cold start)
+- Theme preference not persisted across sessions
 - No password recovery feature yet
-- Limited to 16 predefined invoice descriptions
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👤 Author
+##  Author
 
-**Your Name**
+**Girlweb**
 
 - GitHub: [@Girlweb](https://github.com/Girlweb)
-- LinkedIn: [Your LinkedIn](#)
-- Portfolio: [Your Website](#)
+- Project Link: [FreelancePay Tracker](https://github.com/Girlweb/freelance-tracker)
 
 ##  Acknowledgments
 
@@ -246,10 +262,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ##  Support
 
-For support, email support@freelancepay.com or open an issue on GitHub.
+For support, open an issue on [GitHub](https://github.com/Girlweb/freelance-tracker/issues).
 
 ---
 
 **Made with ❤️ by Girlweb**
 
-⭐ Star this repo if you find it helpful!
+ **Star this repo if you find it helpful!**
+
+##  Quick Start
+
+1. **Try the live demo:** https://freelance-tracker-qayl.vercel.app/
+2. **Register a new account**
+3. **Add your first client**
+4. **Create an invoice**
+5. **Track your payments!**
+
+---
+
+###  Project Stats
+
+![GitHub repo size](https://img.shields.io/github/repo-size/Girlweb/freelance-tracker)
+![GitHub stars](https://img.shields.io/github/stars/Girlweb/freelance-tracker?style=social)
+![GitHub forks](https://img.shields.io/github/forks/Girlweb/freelance-tracker?style=social)
