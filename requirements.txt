@@ -1,8 +1,39 @@
-blinker==1.9.0
-click==8.3.1
-Flask==3.1.2
-flask-cors==6.0.1
-itsdangerous==2.2.0
-Jinja2==3.1.6
-MarkupSafe==3.0.3
-Werkzeug==3.1.4
+Flask==3.0.0
+Flask-CORS==4.0.0
+gunicorn==21.2.0
+```
+
+### 2. **Procfile** (for Render/Heroku)
+```
+web: gunicorn app:app
+```
+
+### 3. **.gitignore**
+```
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Database
+*.db
+*.sqlite3
+test_*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env

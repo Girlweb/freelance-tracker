@@ -7,13 +7,10 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-        <span id="theme-icon">☀️</span>
-    </button>
     <!-- Sidebar Navigation -->
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2> FreelancePay</h2>
+            <h2>💼 FreelancePay</h2>
             <button class="close-btn" onclick="toggleSidebar()">✕</button>
         </div>
         <ul class="nav-menu">
@@ -21,6 +18,7 @@
             <li><a href="#" onclick="showPage('clients')" class="nav-link">→ Clients</a></li>
             <li><a href="#" onclick="showPage('invoices')" class="nav-link">→ Invoices</a></li>
             <li><a href="#" onclick="showPage('reports')" class="nav-link">→ Reports</a></li>
+            <li><a href="#" onclick="showPage('settings')" class="nav-link">→ Settings</a></li>
             <li><a href="#" onclick="showPage('support')" class="nav-link">→ Support</a></li>
         </ul>
         <div class="sidebar-footer">
@@ -33,7 +31,21 @@
             <button class="menu-btn" onclick="toggleSidebar()">☰</button>
             <h1>FreelancePay Tracker</h1>
             <div class="user-info">
-                <span id="user-name">Welcome!</span>
+                <div class="profile-menu" onclick="toggleProfileMenu()">
+                    <div class="profile-icon">
+                        <span id="user-initials">U</span>
+                    </div>
+                    <span id="user-name-topbar">User</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="profile-dropdown" id="profile-dropdown">
+                    <div class="profile-dropdown-item" onclick="showPage('settings')">
+                        ⚙️ Settings
+                    </div>
+                    <div class="profile-dropdown-item" onclick="logout()">
+                        🚪 Logout
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -84,9 +96,10 @@
             </div>
         </div>
 
-        <!-- Main App (shown only when logged in) -->
+        <!-- Main App -->
         <div id="app-container" style="display: none;">
             
+            <!-- HOME PAGE -->
             <div id="home-page" class="page active">
                 <section class="welcome-section">
                     <h2>Welcome Back!</h2>
@@ -125,11 +138,18 @@
                 </section>
             </div>
 
+            <!-- CLIENTS PAGE -->
             <div id="clients-page" class="page">
                 <section class="page-header">
                     <h2>Manage Clients</h2>
                     <p>Add, view, and manage all your clients</p>
                 </section>
+
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <input type="text" id="client-search" placeholder="🔍 Search clients by name or email..." oninput="filterClients()">
+                </div>
+
                 <div class="form-container">
                     <h3>Add New Client</h3>
                     <form id="client-form" onsubmit="addClient(event); return false;">
@@ -155,11 +175,20 @@
                 </div>
             </div>
 
+            <!-- INVOICES PAGE -->
             <div id="invoices-page" class="page">
                 <section class="page-header">
                     <h2>Manage Invoices</h2>
                     <p>Create and track all your invoices</p>
                 </section>
+
+                <!-- Filter Bar -->
+                <div class="filter-container">
+                    <button class="filter-btn active" onclick="filterInvoices('all')">All</button>
+                    <button class="filter-btn" onclick="filterInvoices('paid')">Paid</button>
+                    <button class="filter-btn" onclick="filterInvoices('unpaid')">Unpaid</button>
+                </div>
+
                 <div class="form-container">
                     <h3>Create New Invoice</h3>
                     <form id="invoice-form" onsubmit="addInvoice(event); return false;">
@@ -194,6 +223,7 @@
                 <div id="invoices-list" class="list-container"></div>
             </div>
 
+            <!-- REPORTS PAGE -->
             <div id="reports-page" class="page">
                 <section class="page-header">
                     <h2>Financial Reports</h2>
@@ -212,6 +242,74 @@
                 </div>
             </div>
 
+            <!-- SETTINGS PAGE -->
+            <div id="settings-page" class="page">
+                <section class="page-header">
+                    <h2>Settings</h2>
+                    <p>Manage your account and preferences</p>
+                </section>
+                <div class="settings-container">
+                    <div class="settings-card">
+                        <h3>👤 Account Information</h3>
+                        <div class="settings-info">
+                            <div class="info-row">
+                                <span class="info-label">Name:</span>
+                                <span class="info-value" id="settings-name">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value" id="settings-email">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Member Since:</span>
+                                <span class="info-value" id="settings-joined">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <h3>🎨 Appearance</h3>
+                        <div class="settings-option">
+                            <div>
+                                <strong>Theme</strong>
+                                <p class="setting-description">Choose your preferred color scheme</p>
+                            </div>
+                            <button onclick="toggleTheme()" class="theme-toggle-btn" id="theme-toggle-btn">
+                                <span id="theme-icon">☀️</span>
+                                <span id="theme-label">Light Mode</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <h3>💼 Business Stats</h3>
+                        <div class="settings-info">
+                            <div class="info-row">
+                                <span class="info-label">Total Clients:</span>
+                                <span class="info-value" id="settings-total-clients">0</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Total Invoices:</span>
+                                <span class="info-value" id="settings-total-invoices">0</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Total Revenue:</span>
+                                <span class="info-value" id="settings-total-revenue">KSh 0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card danger-zone">
+                        <h3>⚠️ Danger Zone</h3>
+                        <p class="danger-warning">These actions are irreversible. Please be careful.</p>
+                        <button class="danger-btn" onclick="alert('Password change feature coming soon!')">
+                            Change Password
+                        </button>
+                        <button class="danger-btn" onclick="alert('Account deletion feature coming soon!')">
+                            Delete Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUPPORT PAGE -->
             <div id="support-page" class="page">
                 <section class="page-header">
                     <h2>Support & Help</h2>
@@ -242,6 +340,46 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- Edit Client Modal -->
+    <div id="edit-client-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Client</h2>
+                <span class="modal-close" onclick="closeEditClientModal()">&times;</span>
+            </div>
+            <form id="edit-client-form" onsubmit="updateClient(event); return false;">
+                <input type="hidden" id="edit-client-id">
+                <input type="text" id="edit-client-name" placeholder="Client Name" required>
+                <input type="email" id="edit-client-email" placeholder="Email" required>
+                <input type="tel" id="edit-client-phone" placeholder="Phone (optional)">
+                <div class="modal-actions">
+                    <button type="button" onclick="closeEditClientModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Invoice Modal -->
+    <div id="edit-invoice-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Invoice</h2>
+                <span class="modal-close" onclick="closeEditInvoiceModal()">&times;</span>
+            </div>
+            <form id="edit-invoice-form" onsubmit="updateInvoice(event); return false;">
+                <input type="hidden" id="edit-invoice-id">
+                <input type="number" id="edit-invoice-amount" placeholder="Amount (KSh)" step="0.01" required>
+                <input type="text" id="edit-invoice-description" placeholder="Description" required>
+                <input type="date" id="edit-invoice-due-date" required>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeEditInvoiceModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 
