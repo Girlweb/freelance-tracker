@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from models import get_db, init_db, create_user, get_user_by_email, get_user_by_id, verify_password
+from models_supabase import get_db, init_db, create_user, get_user_by_email, get_user_by_id, verify_password
 from datetime import timedelta
 import os
 
@@ -118,7 +118,7 @@ def get_current_user():
         'id': user['id'],
         'email': user['email'],
         'name': user['name'],
-        'created_at': user['created_at']
+        'created_at': str(user['created_at'])
     }), 200
 
 
@@ -139,10 +139,12 @@ def get_clients():
         return jsonify({'error': 'Not authenticated'}), 401
     
     conn = get_db()
-    clients = conn.execute(
-        'SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC',
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT * FROM clients WHERE user_id = %s ORDER BY created_at DESC',
         (user_id,)
-    ).fetchall()
+    )
+    clients = cursor.fetchall()
     conn.close()
     
     return jsonify([dict(client) for client in clients])
@@ -164,12 +166,13 @@ def create_client():
         return jsonify({'error': 'Name and email are required'}), 400
     
     conn = get_db()
-    cursor = conn.execute(
-        'INSERT INTO clients (user_id, name, email, phone) VALUES (?, ?, ?, ?)',
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO clients (user_id, name, email, phone) VALUES (%s, %s, %s, %s) RETURNING id',
         (user_id, name, email, phone)
     )
+    client_id = cursor.fetchone()['id']
     conn.commit()
-    client_id = cursor.lastrowid
     conn.close()
     
     return jsonify({'id': client_id, 'message': 'Client created successfully'}), 201
@@ -191,20 +194,22 @@ def update_client(client_id):
         return jsonify({'error': 'Name and email are required'}), 400
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Verify client belongs to user
-    client = conn.execute(
-        'SELECT * FROM clients WHERE id = ? AND user_id = ?',
+    cursor.execute(
+        'SELECT * FROM clients WHERE id = %s AND user_id = %s',
         (client_id, user_id)
-    ).fetchone()
+    )
+    client = cursor.fetchone()
     
     if not client:
         conn.close()
         return jsonify({'error': 'Client not found or unauthorized'}), 404
     
     # Update client
-    conn.execute(
-        'UPDATE clients SET name = ?, email = ?, phone = ? WHERE id = ?',
+    cursor.execute(
+        'UPDATE clients SET name = %s, email = %s, phone = %s WHERE id = %s',
         (name, email, phone, client_id)
     )
     conn.commit()
@@ -221,20 +226,22 @@ def delete_client(client_id):
         return jsonify({'error': 'Not authenticated'}), 401
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Verify client belongs to user
-    client = conn.execute(
-        'SELECT * FROM clients WHERE id = ? AND user_id = ?',
+    cursor.execute(
+        'SELECT * FROM clients WHERE id = %s AND user_id = %s',
         (client_id, user_id)
-    ).fetchone()
+    )
+    client = cursor.fetchone()
     
     if not client:
         conn.close()
         return jsonify({'error': 'Client not found or unauthorized'}), 404
     
     # Delete client and associated invoices
-    conn.execute('DELETE FROM clients WHERE id = ?', (client_id,))
-    conn.execute('DELETE FROM invoices WHERE client_id = ?', (client_id,))
+    cursor.execute('DELETE FROM clients WHERE id = %s', (client_id,))
+    cursor.execute('DELETE FROM invoices WHERE client_id = %s', (client_id,))
     conn.commit()
     conn.close()
     
@@ -251,21 +258,33 @@ def get_invoices():
         return jsonify({'error': 'Not authenticated'}), 401
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Join to ensure only user's invoices are returned
-    invoices = conn.execute('''
+    cursor.execute('''
         SELECT 
             invoices.*,
             clients.name as client_name
         FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE clients.user_id = ?
+        WHERE clients.user_id = %s
         ORDER BY invoices.created_at DESC
-    ''', (user_id,)).fetchall()
+    ''', (user_id,))
     
+    invoices = cursor.fetchall()
     conn.close()
     
-    return jsonify([dict(invoice) for invoice in invoices])
+    # Convert dates to strings for JSON serialization
+    result = []
+    for invoice in invoices:
+        inv_dict = dict(invoice)
+        if inv_dict.get('due_date'):
+            inv_dict['due_date'] = str(inv_dict['due_date'])
+        if inv_dict.get('created_at'):
+            inv_dict['created_at'] = str(inv_dict['created_at'])
+        result.append(inv_dict)
+    
+    return jsonify(result)
 
 
 @app.route('/api/invoices', methods=['POST'])
@@ -279,29 +298,31 @@ def create_invoice():
     client_id = data.get('client_id')
     amount = data.get('amount')
     description = data.get('description', '')
-    due_date = data.get('due_date', '')
+    due_date = data.get('due_date', None)
     
     if not client_id or not amount:
         return jsonify({'error': 'Client ID and amount are required'}), 400
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Verify client belongs to user
-    client = conn.execute(
-        'SELECT * FROM clients WHERE id = ? AND user_id = ?',
+    cursor.execute(
+        'SELECT * FROM clients WHERE id = %s AND user_id = %s',
         (client_id, user_id)
-    ).fetchone()
+    )
+    client = cursor.fetchone()
     
     if not client:
         conn.close()
         return jsonify({'error': 'Client not found or unauthorized'}), 404
     
-    cursor = conn.execute(
-        'INSERT INTO invoices (client_id, amount, description, due_date) VALUES (?, ?, ?, ?)',
+    cursor.execute(
+        'INSERT INTO invoices (client_id, amount, description, due_date) VALUES (%s, %s, %s, %s) RETURNING id',
         (client_id, amount, description, due_date)
     )
+    invoice_id = cursor.fetchone()['id']
     conn.commit()
-    invoice_id = cursor.lastrowid
     conn.close()
     
     return jsonify({'id': invoice_id, 'message': 'Invoice created successfully'}), 201
@@ -317,27 +338,30 @@ def update_invoice(invoice_id):
     data = request.get_json()
     amount = data.get('amount')
     description = data.get('description', '')
-    due_date = data.get('due_date', '')
+    due_date = data.get('due_date', None)
     
     if not amount:
         return jsonify({'error': 'Amount is required'}), 400
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Verify invoice belongs to user's client
-    invoice = conn.execute('''
+    cursor.execute('''
         SELECT invoices.* FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE invoices.id = ? AND clients.user_id = ?
-    ''', (invoice_id, user_id)).fetchone()
+        WHERE invoices.id = %s AND clients.user_id = %s
+    ''', (invoice_id, user_id))
+    
+    invoice = cursor.fetchone()
     
     if not invoice:
         conn.close()
         return jsonify({'error': 'Invoice not found or unauthorized'}), 404
     
     # Update invoice
-    conn.execute(
-        'UPDATE invoices SET amount = ?, description = ?, due_date = ? WHERE id = ?',
+    cursor.execute(
+        'UPDATE invoices SET amount = %s, description = %s, due_date = %s WHERE id = %s',
         (amount, description, due_date, invoice_id)
     )
     conn.commit()
@@ -360,19 +384,22 @@ def update_invoice_status(invoice_id):
         return jsonify({'error': 'Status must be paid or unpaid'}), 400
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Verify invoice belongs to user's client
-    invoice = conn.execute('''
+    cursor.execute('''
         SELECT invoices.* FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE invoices.id = ? AND clients.user_id = ?
-    ''', (invoice_id, user_id)).fetchone()
+        WHERE invoices.id = %s AND clients.user_id = %s
+    ''', (invoice_id, user_id))
+    
+    invoice = cursor.fetchone()
     
     if not invoice:
         conn.close()
         return jsonify({'error': 'Invoice not found or unauthorized'}), 404
     
-    conn.execute('UPDATE invoices SET status = ? WHERE id = ?', (status, invoice_id))
+    cursor.execute('UPDATE invoices SET status = %s WHERE id = %s', (status, invoice_id))
     conn.commit()
     conn.close()
     
@@ -387,19 +414,22 @@ def delete_invoice(invoice_id):
         return jsonify({'error': 'Not authenticated'}), 401
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Verify invoice belongs to user's client
-    invoice = conn.execute('''
+    cursor.execute('''
         SELECT invoices.* FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE invoices.id = ? AND clients.user_id = ?
-    ''', (invoice_id, user_id)).fetchone()
+        WHERE invoices.id = %s AND clients.user_id = %s
+    ''', (invoice_id, user_id))
+    
+    invoice = cursor.fetchone()
     
     if not invoice:
         conn.close()
         return jsonify({'error': 'Invoice not found or unauthorized'}), 404
     
-    conn.execute('DELETE FROM invoices WHERE id = ?', (invoice_id,))
+    cursor.execute('DELETE FROM invoices WHERE id = %s', (invoice_id,))
     conn.commit()
     conn.close()
     
@@ -416,30 +446,35 @@ def get_stats():
         return jsonify({'error': 'Not authenticated'}), 401
     
     conn = get_db()
+    cursor = conn.cursor()
     
     # Get stats scoped to current user
-    total_clients = conn.execute(
-        'SELECT COUNT(*) as count FROM clients WHERE user_id = ?',
+    cursor.execute(
+        'SELECT COUNT(*) as count FROM clients WHERE user_id = %s',
         (user_id,)
-    ).fetchone()['count']
+    )
+    total_clients = cursor.fetchone()['count']
     
-    total_invoices = conn.execute('''
+    cursor.execute('''
         SELECT COUNT(*) as count FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE clients.user_id = ?
-    ''', (user_id,)).fetchone()['count']
+        WHERE clients.user_id = %s
+    ''', (user_id,))
+    total_invoices = cursor.fetchone()['count']
     
-    paid_total = conn.execute('''
-        SELECT SUM(amount) as total FROM invoices
+    cursor.execute('''
+        SELECT COALESCE(SUM(amount), 0) as total FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE clients.user_id = ? AND invoices.status = 'paid'
-    ''', (user_id,)).fetchone()['total'] or 0
+        WHERE clients.user_id = %s AND invoices.status = 'paid'
+    ''', (user_id,))
+    paid_total = float(cursor.fetchone()['total'])
     
-    unpaid_total = conn.execute('''
-        SELECT SUM(amount) as total FROM invoices
+    cursor.execute('''
+        SELECT COALESCE(SUM(amount), 0) as total FROM invoices
         JOIN clients ON invoices.client_id = clients.id
-        WHERE clients.user_id = ? AND invoices.status = 'unpaid'
-    ''', (user_id,)).fetchone()['total'] or 0
+        WHERE clients.user_id = %s AND invoices.status = 'unpaid'
+    ''', (user_id,))
+    unpaid_total = float(cursor.fetchone()['total'])
     
     conn.close()
     
