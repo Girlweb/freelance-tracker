@@ -4,7 +4,7 @@ from models_supabase import get_db, init_db, create_user, get_user_by_email, get
 from datetime import timedelta
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 
 # Session configuration - use environment variable in production
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -28,6 +28,11 @@ CORS(app,
      origins=allowed_origins,
      allow_headers=['Content-Type'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+
+@app.route('/')
+def home():
+    """Serve the frontend"""
+    return app.send_static_file('index.html')
 
 init_db()
 
@@ -486,9 +491,6 @@ def get_stats():
     })
 
 
+# For Vercel serverless deployment
 if __name__ == '__main__':
-    # Use PORT from environment variable (for deployment) or default to 5000
-    port = int(os.environ.get('PORT', 5000))
-    # Set debug=False for production
-    debug = os.environ.get('DEBUG', 'True') == 'True'
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
