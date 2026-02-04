@@ -4,7 +4,7 @@
  */
 
 // API configuration
-const API_URL = 'https://freelance-tracker-api.onrender.com/api';
+const API_URL = 'https://freelance-tracker-qayl.vercel.app/api';
 
 let currentPage = 'home';
 let currentUser = null;
