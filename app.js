@@ -1,53 +1,47 @@
 /**
- * app.js - Complete Frontend JavaScript for FreelancePay Tracker
- * NEW FEATURES: Edit clients, Edit invoices, Search clients, Filter invoices
+ * app.js - FreelancePay Tracker with Supabase
+ * Pure frontend app - No Flask backend needed!
  */
 
-// API configuration
-const API_URL = 'https://freelance-tracker-api.onrender.com/api';
+// Initialize Supabase client
+const SUPABASE_URL = 'https://ollwfglnkccowmaoouck.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sbHdmZ2xua2Njb3dtYW9vdWNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyNjc0OTgsImV4cCI6MjA4NDg0MzQ5OH0.T0v3e3mPfvEIr9knf11PNpmRgbJWhVxaLL9FBswldGE';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentPage = 'home';
 let currentUser = null;
-let allClients = []; // Store all clients for search filtering
-let allInvoices = []; // Store all invoices for status filtering
-let currentFilter = 'all'; // Current invoice filter status
+let allClients = [];
+let allInvoices = [];
+let currentFilter = 'all';
 
-// Initialize app on page load
-function init() {
-    checkAuthStatus();
+// Initialize app
+async function init() {
+    await checkAuthStatus();
 }
 
 window.addEventListener('DOMContentLoaded', init);
 
-
 // ============ AUTHENTICATION ============
 
 async function checkAuthStatus() {
-    try {
-        const response = await fetch(`${API_URL}/me`, {
-            credentials: 'include'
-        });
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+        currentUser = session.user;
         
-        if (response.ok) {
-            const user = await response.json();
-            currentUser = user;
-            
-            if (user.name) {
-                const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
-                document.getElementById('user-initials').textContent = initials;
-                document.getElementById('user-name-topbar').textContent = user.name.split(' ')[0];
-            }
-            
-            showMainApp();
-            loadStats();
-            loadClients();
-            loadInvoices();
-            loadClientOptions();
-        } else {
-            showAuthPage('login');
-        }
-    } catch (error) {
-        console.error('Error checking auth status:', error);
+        // Set user initials
+        const email = currentUser.email;
+        const initials = email.substring(0, 2).toUpperCase();
+        document.getElementById('user-initials').textContent = initials;
+        document.getElementById('user-name-topbar').textContent = email.split('@')[0];
+        
+        showMainApp();
+        await loadStats();
+        await loadClients();
+        await loadInvoices();
+        await loadClientOptions();
+    } else {
         showAuthPage('login');
     }
 }
@@ -64,25 +58,26 @@ async function handleRegister(event) {
     errorDiv.classList.remove('show');
     
     try {
-        const response = await fetch(`${API_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ name, email, password })
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    name: name
+                }
+            }
         });
         
-        const data = await response.json();
-        
-        if (response.ok) {
-            alert('Registration successful!');
-            await checkAuthStatus();
-        } else {
-            errorDiv.textContent = data.error || 'Registration failed.';
+        if (error) {
+            errorDiv.textContent = error.message;
             errorDiv.classList.add('show');
+        } else {
+            alert('Registration successful! Please check your email to confirm your account.');
+            showAuthPage('login');
         }
     } catch (error) {
         console.error('Registration error:', error);
-        errorDiv.textContent = 'Network error. Please try again.';
+        errorDiv.textContent = 'Registration failed. Please try again.';
         errorDiv.classList.add('show');
     }
 }
@@ -98,25 +93,20 @@ async function handleLogin(event) {
     errorDiv.classList.remove('show');
     
     try {
-        const response = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ email, password })
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
         });
         
-        const data = await response.json();
-        
-        if (response.ok) {
-            alert('Login successful!');
-            await checkAuthStatus();
-        } else {
-            errorDiv.textContent = data.error || 'Invalid credentials.';
+        if (error) {
+            errorDiv.textContent = error.message;
             errorDiv.classList.add('show');
+        } else {
+            await checkAuthStatus();
         }
     } catch (error) {
         console.error('Login error:', error);
-        errorDiv.textContent = 'Network error. Please try again.';
+        errorDiv.textContent = 'Login failed. Please try again.';
         errorDiv.classList.add('show');
     }
 }
@@ -126,21 +116,10 @@ async function logout() {
         return;
     }
     
-    try {
-        await fetch(`${API_URL}/logout`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        
-        currentUser = null;
-        showAuthPage('login');
-        alert('Logged out successfully!');
-    } catch (error) {
-        console.error('Logout error:', error);
-        showAuthPage('login');
-    }
+    await supabase.auth.signOut();
+    currentUser = null;
+    showAuthPage('login');
 }
-
 
 // ============ PAGE NAVIGATION ============
 
@@ -197,7 +176,6 @@ function toggleSidebar() {
     sidebar.classList.toggle('active');
 }
 
-
 // ============ PROFILE MENU ============
 
 function toggleProfileMenu() {
@@ -216,7 +194,6 @@ document.addEventListener('click', function(event) {
     }
 });
 
-
 // ============ THEME SWITCHING ============
 
 function toggleTheme() {
@@ -233,129 +210,113 @@ function toggleTheme() {
     }
 }
 
-
 // ============ SETTINGS PAGE ============
 
 function updateSettingsPage() {
     if (currentUser) {
-        document.getElementById('settings-name').textContent = currentUser.name || '-';
+        document.getElementById('settings-name').textContent = currentUser.user_metadata?.name || '-';
         document.getElementById('settings-email').textContent = currentUser.email || '-';
-        
-        if (currentUser.created_at) {
-            document.getElementById('settings-joined').textContent = formatDate(currentUser.created_at);
-        } else {
-            document.getElementById('settings-joined').textContent = '-';
-        }
+        document.getElementById('settings-joined').textContent = formatDate(currentUser.created_at);
     }
 }
 
-function loadSettingsStats() {
-    fetch(`${API_URL}/stats`, { credentials: 'include' })
-        .then(response => response.json())
-        .then(stats => {
-            document.getElementById('settings-total-clients').textContent = stats.total_clients || 0;
-            document.getElementById('settings-total-invoices').textContent = stats.total_invoices || 0;
-            const totalRevenue = (stats.paid_total || 0) + (stats.unpaid_total || 0);
-            document.getElementById('settings-total-revenue').textContent = `KSh ${totalRevenue.toFixed(2)}`;
-        })
-        .catch(error => console.error('Error loading settings stats:', error));
+async function loadSettingsStats() {
+    const stats = await getStats();
+    document.getElementById('settings-total-clients').textContent = stats.total_clients;
+    document.getElementById('settings-total-invoices').textContent = stats.total_invoices;
+    const totalRevenue = stats.paid_total + stats.unpaid_total;
+    document.getElementById('settings-total-revenue').textContent = `KSh ${totalRevenue.toFixed(2)}`;
 }
-
 
 // ============ DASHBOARD ============
 
 async function loadStats() {
-    try {
-        const response = await fetch(`${API_URL}/stats`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to load stats');
-        }
-        
-        const stats = await response.json();
-        
-        document.getElementById('home-total-clients').textContent = stats.total_clients;
-        document.getElementById('home-total-invoices').textContent = stats.total_invoices;
-        document.getElementById('home-paid-total').textContent = `KSh ${stats.paid_total.toFixed(2)}`;
-        document.getElementById('home-unpaid-total').textContent = `KSh ${stats.unpaid_total.toFixed(2)}`;
-        
-        document.getElementById('month-revenue').textContent = `KSh ${stats.paid_total.toFixed(2)}`;
-        if (stats.total_invoices > 0) {
-            const avg = (stats.paid_total + stats.unpaid_total) / stats.total_invoices;
-            document.getElementById('avg-invoice').textContent = `KSh ${avg.toFixed(2)}`;
-        }
-        
-        loadRecentInvoices();
-    } catch (error) {
-        console.error('Error loading stats:', error);
+    const stats = await getStats();
+    
+    document.getElementById('home-total-clients').textContent = stats.total_clients;
+    document.getElementById('home-total-invoices').textContent = stats.total_invoices;
+    document.getElementById('home-paid-total').textContent = `KSh ${stats.paid_total.toFixed(2)}`;
+    document.getElementById('home-unpaid-total').textContent = `KSh ${stats.unpaid_total.toFixed(2)}`;
+    
+    document.getElementById('month-revenue').textContent = `KSh ${stats.paid_total.toFixed(2)}`;
+    if (stats.total_invoices > 0) {
+        const avg = (stats.paid_total + stats.unpaid_total) / stats.total_invoices;
+        document.getElementById('avg-invoice').textContent = `KSh ${avg.toFixed(2)}`;
     }
+    
+    await loadRecentInvoices();
 }
 
 async function loadRecentInvoices() {
-    try {
-        const response = await fetch(`${API_URL}/invoices`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) return;
-        
-        const invoices = await response.json();
-        const recentList = document.getElementById('recent-invoices-list');
-        
-        if (invoices.length === 0) {
-            recentList.innerHTML = '<p class="empty-message">No invoices yet</p>';
-            return;
-        }
-        
-        const recent = invoices.slice(0, 5);
-        recentList.innerHTML = recent.map(invoice => `
-            <div class="activity-item">
-                <div>
-                    <strong>${invoice.client_name}</strong>
-                    <p style="font-size: 0.875rem; color: var(--text-secondary);">${invoice.description || 'No description'}</p>
-                </div>
-                <div style="text-align: right;">
-                    <strong>KSh ${parseFloat(invoice.amount).toFixed(2)}</strong>
-                    <p style="font-size: 0.875rem;">
-                        <span class="status-badge ${invoice.status}">${invoice.status.toUpperCase()}</span>
-                    </p>
-                </div>
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('Error loading recent invoices:', error);
+    const { data: invoices } = await supabase
+        .from('invoices')
+        .select(`
+            *,
+            client:clients(name)
+        `)
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+    
+    const recentList = document.getElementById('recent-invoices-list');
+    
+    if (!invoices || invoices.length === 0) {
+        recentList.innerHTML = '<p class="empty-message">No invoices yet</p>';
+        return;
     }
+    
+    recentList.innerHTML = invoices.map(invoice => `
+        <div class="activity-item">
+            <div>
+                <strong>${invoice.client.name}</strong>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">${invoice.description || 'No description'}</p>
+            </div>
+            <div style="text-align: right;">
+                <strong>KSh ${parseFloat(invoice.amount).toFixed(2)}</strong>
+                <p style="font-size: 0.875rem;">
+                    <span class="status-badge ${invoice.status}">${invoice.status.toUpperCase()}</span>
+                </p>
+            </div>
+        </div>
+    `).join('');
 }
 
+async function getStats() {
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id);
+    
+    const { data: invoices } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('user_id', currentUser.id);
+    
+    const paid = invoices?.filter(i => i.status === 'paid') || [];
+    const unpaid = invoices?.filter(i => i.status === 'unpaid') || [];
+    
+    const paidTotal = paid.reduce((sum, i) => sum + parseFloat(i.amount), 0);
+    const unpaidTotal = unpaid.reduce((sum, i) => sum + parseFloat(i.amount), 0);
+    
+    return {
+        total_clients: clients?.length || 0,
+        total_invoices: invoices?.length || 0,
+        paid_total: paidTotal,
+        unpaid_total: unpaidTotal
+    };
+}
 
-// ============ CLIENTS (WITH SEARCH & EDIT) ============
+// ============ CLIENTS ============
 
 async function loadClients() {
-    try {
-        const response = await fetch(`${API_URL}/clients`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to load clients');
-        }
-        
-        const clients = await response.json();
-        allClients = clients; // Store for filtering
-        renderClients(clients);
-    } catch (error) {
-        console.error('Error loading clients:', error);
-    }
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+    
+    allClients = clients || [];
+    renderClients(allClients);
 }
 
 function renderClients(clients) {
@@ -368,9 +329,9 @@ function renderClients(clients) {
     
     tableBody.innerHTML = clients.map(client => `
         <tr>
-            <td><strong>${client.name}</strong></td>
-            <td>${client.email}</td>
-            <td>${client.phone || 'Not provided'}</td>
+            <td><strong>${escapeHtml(client.name)}</strong></td>
+            <td>${escapeHtml(client.email)}</td>
+            <td>${escapeHtml(client.phone || 'Not provided')}</td>
             <td>${formatDate(client.created_at)}</td>
             <td class="action-cell">
                 <button class="btn-small" onclick="openEditClientModal(${client.id}, '${escapeHtml(client.name)}', '${escapeHtml(client.email)}', '${escapeHtml(client.phone || '')}')">Edit</button>
@@ -380,7 +341,6 @@ function renderClients(clients) {
     `).join('');
 }
 
-// NEW: Search/Filter clients
 function filterClients() {
     const searchTerm = document.getElementById('client-search').value.toLowerCase();
     
@@ -399,34 +359,24 @@ async function addClient(event) {
     const email = document.getElementById('client-email').value;
     const phone = document.getElementById('client-phone').value;
     
-    try {
-        const response = await fetch(`${API_URL}/clients`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ name, email, phone })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to add client');
-        }
-        
-        document.getElementById('client-form').reset();
-        loadClients();
-        loadClientOptions();
-        loadStats();
-        alert('Client added successfully!');
-    } catch (error) {
-        console.error('Error adding client:', error);
-        alert('Failed to add client.');
+    const { error } = await supabase
+        .from('clients')
+        .insert([
+            { user_id: currentUser.id, name, email, phone }
+        ]);
+    
+    if (error) {
+        alert('Failed to add client: ' + error.message);
+        return;
     }
+    
+    document.getElementById('client-form').reset();
+    await loadClients();
+    await loadClientOptions();
+    await loadStats();
+    alert('Client added successfully!');
 }
 
-// NEW: Edit client modal functions
 function openEditClientModal(id, name, email, phone) {
     document.getElementById('edit-client-id').value = id;
     document.getElementById('edit-client-name').value = name;
@@ -447,30 +397,21 @@ async function updateClient(event) {
     const email = document.getElementById('edit-client-email').value;
     const phone = document.getElementById('edit-client-phone').value;
     
-    try {
-        const response = await fetch(`${API_URL}/clients/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ name, email, phone })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to update client');
-        }
-        
-        closeEditClientModal();
-        loadClients();
-        loadClientOptions();
-        alert('Client updated successfully!');
-    } catch (error) {
-        console.error('Error updating client:', error);
-        alert('Failed to update client.');
+    const { error } = await supabase
+        .from('clients')
+        .update({ name, email, phone })
+        .eq('id', id)
+        .eq('user_id', currentUser.id);
+    
+    if (error) {
+        alert('Failed to update client: ' + error.message);
+        return;
     }
+    
+    closeEditClientModal();
+    await loadClients();
+    await loadClientOptions();
+    alert('Client updated successfully!');
 }
 
 async function deleteClient(clientId) {
@@ -478,85 +419,67 @@ async function deleteClient(clientId) {
         return;
     }
     
-    try {
-        const response = await fetch(`${API_URL}/clients/${clientId}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to delete');
-        }
-        
-        loadClients();
-        loadInvoices();
-        loadClientOptions();
-        loadStats();
-        alert('Client deleted!');
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to delete client.');
+    // Delete invoices first
+    await supabase
+        .from('invoices')
+        .delete()
+        .eq('client_id', clientId);
+    
+    // Then delete client
+    const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+        .eq('user_id', currentUser.id);
+    
+    if (error) {
+        alert('Failed to delete client: ' + error.message);
+        return;
     }
+    
+    await loadClients();
+    await loadInvoices();
+    await loadClientOptions();
+    await loadStats();
+    alert('Client deleted!');
 }
 
 async function loadClientOptions() {
-    try {
-        const response = await fetch(`${API_URL}/clients`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) return;
-        
-        const clients = await response.json();
-        const select = document.getElementById('invoice-client');
-        
-        select.innerHTML = '<option value="">Select Client</option>' + 
-            clients.map(client => `<option value="${client.id}">${client.name}</option>`).join('');
-    } catch (error) {
-        console.error('Error loading client options:', error);
-    }
+    const { data: clients } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('name');
+    
+    const select = document.getElementById('invoice-client');
+    select.innerHTML = '<option value="">Select Client</option>' + 
+        (clients || []).map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join('');
 }
 
-
-// ============ INVOICES (WITH FILTER & EDIT) ============
+// ============ INVOICES ============
 
 async function loadInvoices() {
-    try {
-        const response = await fetch(`${API_URL}/invoices`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to load invoices');
-        }
-        
-        const invoices = await response.json();
-        allInvoices = invoices; // Store for filtering
-        filterInvoices(currentFilter);
-    } catch (error) {
-        console.error('Error loading invoices:', error);
-    }
+    const { data: invoices } = await supabase
+        .from('invoices')
+        .select(`
+            *,
+            client:clients(name)
+        `)
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+    
+    allInvoices = invoices || [];
+    filterInvoices(currentFilter);
 }
 
-// NEW: Filter invoices by status
 function filterInvoices(status) {
     currentFilter = status;
     
-    // Update button states
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
     });
     event?.target?.classList.add('active');
     
-    // Filter invoices
     let filtered = allInvoices;
     if (status !== 'all') {
         filtered = allInvoices.filter(inv => inv.status === status);
@@ -576,12 +499,12 @@ function renderInvoices(invoices) {
     invoicesList.innerHTML = invoices.map(invoice => `
         <div class="card">
             <div class="card-header">
-                <h3>${invoice.client_name}</h3>
+                <h3>${escapeHtml(invoice.client.name)}</h3>
                 <span class="status-badge ${invoice.status}">${invoice.status.toUpperCase()}</span>
             </div>
             <div class="card-body">
                 <p><strong>Amount:</strong> KSh ${parseFloat(invoice.amount).toFixed(2)}</p>
-                <p><strong>Description:</strong> ${invoice.description || 'No description'}</p>
+                <p><strong>Description:</strong> ${escapeHtml(invoice.description || 'No description')}</p>
                 <p><strong>Due Date:</strong> ${formatDate(invoice.due_date)}</p>
                 <p class="card-date">Created: ${formatDate(invoice.created_at)}</p>
             </div>
@@ -600,8 +523,8 @@ function renderInvoices(invoices) {
 async function addInvoice(event) {
     event.preventDefault();
     
-    const client_id = document.getElementById('invoice-client').value;
-    const amount = document.getElementById('invoice-amount').value;
+    const client_id = parseInt(document.getElementById('invoice-client').value);
+    const amount = parseFloat(document.getElementById('invoice-amount').value);
     let description = document.getElementById('invoice-description').value;
     const due_date = document.getElementById('invoice-due-date').value;
     
@@ -613,34 +536,24 @@ async function addInvoice(event) {
         }
     }
     
-    try {
-        const response = await fetch(`${API_URL}/invoices`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ client_id, amount, description, due_date })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to create invoice');
-        }
-        
-        document.getElementById('invoice-form').reset();
-        document.getElementById('invoice-description-custom').style.display = 'none';
-        loadInvoices();
-        loadStats();
-        alert('Invoice created!');
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to create invoice.');
+    const { error } = await supabase
+        .from('invoices')
+        .insert([
+            { user_id: currentUser.id, client_id, amount, description, due_date }
+        ]);
+    
+    if (error) {
+        alert('Failed to create invoice: ' + error.message);
+        return;
     }
+    
+    document.getElementById('invoice-form').reset();
+    document.getElementById('invoice-description-custom').style.display = 'none';
+    await loadInvoices();
+    await loadStats();
+    alert('Invoice created!');
 }
 
-// NEW: Edit invoice modal functions
 function openEditInvoiceModal(id, amount, description, dueDate) {
     document.getElementById('edit-invoice-id').value = id;
     document.getElementById('edit-invoice-amount').value = amount;
@@ -657,34 +570,25 @@ async function updateInvoice(event) {
     event.preventDefault();
     
     const id = document.getElementById('edit-invoice-id').value;
-    const amount = document.getElementById('edit-invoice-amount').value;
+    const amount = parseFloat(document.getElementById('edit-invoice-amount').value);
     const description = document.getElementById('edit-invoice-description').value;
     const due_date = document.getElementById('edit-invoice-due-date').value;
     
-    try {
-        const response = await fetch(`${API_URL}/invoices/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ amount, description, due_date })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to update invoice');
-        }
-        
-        closeEditInvoiceModal();
-        loadInvoices();
-        loadStats();
-        alert('Invoice updated successfully!');
-    } catch (error) {
-        console.error('Error updating invoice:', error);
-        alert('Failed to update invoice.');
+    const { error } = await supabase
+        .from('invoices')
+        .update({ amount, description, due_date })
+        .eq('id', id)
+        .eq('user_id', currentUser.id);
+    
+    if (error) {
+        alert('Failed to update invoice: ' + error.message);
+        return;
     }
+    
+    closeEditInvoiceModal();
+    await loadInvoices();
+    await loadStats();
+    alert('Invoice updated successfully!');
 }
 
 async function markAsPaid(invoiceId) {
@@ -696,29 +600,20 @@ async function markAsUnpaid(invoiceId) {
 }
 
 async function updateInvoiceStatus(invoiceId, status) {
-    try {
-        const response = await fetch(`${API_URL}/invoices/${invoiceId}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ status })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to update');
-        }
-        
-        loadInvoices();
-        loadStats();
-        alert(`Invoice marked as ${status}!`);
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to update invoice.');
+    const { error } = await supabase
+        .from('invoices')
+        .update({ status })
+        .eq('id', invoiceId)
+        .eq('user_id', currentUser.id);
+    
+    if (error) {
+        alert('Failed to update status: ' + error.message);
+        return;
     }
+    
+    await loadInvoices();
+    await loadStats();
+    alert(`Invoice marked as ${status}!`);
 }
 
 async function deleteInvoice(invoiceId) {
@@ -726,29 +621,21 @@ async function deleteInvoice(invoiceId) {
         return;
     }
     
-    try {
-        const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                showAuthPage('login');
-                return;
-            }
-            throw new Error('Failed to delete');
-        }
-        
-        loadInvoices();
-        loadStats();
-        alert('Invoice deleted!');
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to delete invoice.');
+    const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId)
+        .eq('user_id', currentUser.id);
+    
+    if (error) {
+        alert('Failed to delete invoice: ' + error.message);
+        return;
     }
+    
+    await loadInvoices();
+    await loadStats();
+    alert('Invoice deleted!');
 }
-
 
 // ============ UTILITIES ============
 
@@ -760,6 +647,7 @@ function formatDate(dateString) {
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const map = {
         '&': '&amp;',
         '<': '&lt;',
@@ -767,9 +655,8 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
 }
-
 
 // ============ CUSTOM DESCRIPTION TOGGLE ============
 
