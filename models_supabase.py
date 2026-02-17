@@ -23,9 +23,49 @@ def verify_password(stored_password, provided_password):
     return stored_password == hash_password(provided_password)
 
 def init_db():
-    """Initialize database tables with user authentication support."""
-    conn = get_db()
-    cursor = conn.cursor()
+    """Initialize database tables"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS clients (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                phone TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS invoices (
+                id SERIAL PRIMARY KEY,
+                client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                amount DECIMAL(10,2) NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'unpaid',
+                due_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        print("Database initialized!")
+    except Exception as e:
+        print(f"Database init error: {e}")
     
     # Users table
     cursor.execute('''
