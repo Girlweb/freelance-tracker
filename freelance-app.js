@@ -6,7 +6,7 @@
 // API Configuration
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5000'
-    : 'https://freelance-tracker-production.up.railway.app';
+    : 'https://freelance-tracker-production.up.railway.app'\;
 
 let currentPage = 'home';
 let currentUser = null;
@@ -27,7 +27,7 @@ async function apiRequest(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
         ...options,
-        credentials: 'include', // Important for session cookies
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             ...options.headers,
@@ -59,8 +59,11 @@ async function checkAuthStatus() {
         // Set user initials
         const email = user.email;
         const initials = email.substring(0, 2).toUpperCase();
-        document.getElementById('user-initials').textContent = initials;
-        document.getElementById('user-name-topbar').textContent = user.name || email.split('@')[0];
+        const userInitialsEl = document.getElementById('user-initials');
+        const userNameEl = document.getElementById('user-name-topbar');
+        
+        if (userInitialsEl) userInitialsEl.textContent = initials;
+        if (userNameEl) userNameEl.textContent = user.name || email.split('@')[0];
         
         showMainApp();
         await loadStats();
@@ -132,21 +135,30 @@ async function logout() {
 }
 
 function showAuthPage(page) {
-    document.getElementById('auth-container').style.display = 'flex';
-    document.getElementById('app-container').style.display = 'none';
+    const loginPage = document.getElementById('login-page');
+    const registerPage = document.getElementById('register-page');
+    const appContainer = document.getElementById('app-container');
+    
+    if (appContainer) appContainer.style.display = 'none';
     
     if (page === 'login') {
-        document.getElementById('login-form-container').style.display = 'block';
-        document.getElementById('register-form-container').style.display = 'none';
+        if (loginPage) loginPage.style.display = 'flex';
+        if (registerPage) registerPage.style.display = 'none';
     } else {
-        document.getElementById('login-form-container').style.display = 'none';
-        document.getElementById('register-form-container').style.display = 'block';
+        if (loginPage) loginPage.style.display = 'none';
+        if (registerPage) registerPage.style.display = 'flex';
     }
 }
 
 function showMainApp() {
-    document.getElementById('auth-container').style.display = 'none';
-    document.getElementById('app-container').style.display = 'flex';
+    const loginPage = document.getElementById('login-page');
+    const registerPage = document.getElementById('register-page');
+    const appContainer = document.getElementById('app-container');
+    
+    if (loginPage) loginPage.style.display = 'none';
+    if (registerPage) registerPage.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'flex';
+    
     showPage('home');
 }
 
@@ -190,12 +202,14 @@ function showPage(pageName) {
 
 function toggleSidebar() {
     const sidebar = document.querySelector('.sidebar');
-    sidebar.classList.toggle('collapsed');
+    if (sidebar) sidebar.classList.toggle('collapsed');
 }
 
 function toggleProfileMenu() {
     const menu = document.querySelector('.profile-dropdown');
-    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    if (menu) {
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
 }
 
 function toggleTheme() {
@@ -207,17 +221,25 @@ function toggleTheme() {
 
 function updateSettingsPage() {
     const isDark = document.body.classList.contains('dark-mode');
-    document.getElementById('theme-light').classList.toggle('active', !isDark);
-    document.getElementById('theme-dark').classList.toggle('active', isDark);
+    const themeLight = document.getElementById('theme-light');
+    const themeDark = document.getElementById('theme-dark');
+    
+    if (themeLight) themeLight.classList.toggle('active', !isDark);
+    if (themeDark) themeDark.classList.toggle('active', isDark);
+    
     loadSettingsStats();
 }
 
 async function loadSettingsStats() {
     try {
         const stats = await getStats();
-        document.getElementById('settings-total-clients').textContent = stats.total_clients;
-        document.getElementById('settings-total-invoices').textContent = stats.total_invoices;
-        document.getElementById('settings-total-earned').textContent = `$${stats.paid_total.toFixed(2)}`;
+        const clientsEl = document.getElementById('settings-total-clients');
+        const invoicesEl = document.getElementById('settings-total-invoices');
+        const earnedEl = document.getElementById('settings-total-earned');
+        
+        if (clientsEl) clientsEl.textContent = stats.total_clients;
+        if (invoicesEl) invoicesEl.textContent = stats.total_invoices;
+        if (earnedEl) earnedEl.textContent = `$${stats.paid_total.toFixed(2)}`;
     } catch (error) {
         console.error('Failed to load settings stats:', error);
     }
@@ -229,10 +251,15 @@ async function loadStats() {
     try {
         const stats = await getStats();
         
-        document.getElementById('total-clients').textContent = stats.total_clients;
-        document.getElementById('total-invoices').textContent = stats.total_invoices;
-        document.getElementById('paid-total').textContent = `$${stats.paid_total.toFixed(2)}`;
-        document.getElementById('unpaid-total').textContent = `$${stats.unpaid_total.toFixed(2)}`;
+        const totalClientsEl = document.getElementById('total-clients');
+        const totalInvoicesEl = document.getElementById('total-invoices');
+        const paidTotalEl = document.getElementById('paid-total');
+        const unpaidTotalEl = document.getElementById('unpaid-total');
+        
+        if (totalClientsEl) totalClientsEl.textContent = stats.total_clients;
+        if (totalInvoicesEl) totalInvoicesEl.textContent = stats.total_invoices;
+        if (paidTotalEl) paidTotalEl.textContent = `$${stats.paid_total.toFixed(2)}`;
+        if (unpaidTotalEl) unpaidTotalEl.textContent = `$${stats.unpaid_total.toFixed(2)}`;
     } catch (error) {
         console.error('Failed to load stats:', error);
     }
@@ -244,6 +271,8 @@ async function loadRecentInvoices() {
         const recentInvoices = invoices.slice(0, 5);
         
         const tbody = document.getElementById('recent-invoices-table');
+        if (!tbody) return;
+        
         tbody.innerHTML = '';
         
         if (recentInvoices.length === 0) {
@@ -285,6 +314,8 @@ async function loadClients() {
 
 function renderClients(clients) {
     const tbody = document.getElementById('clients-table');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (clients.length === 0) {
@@ -308,7 +339,8 @@ function renderClients(clients) {
 }
 
 function filterClients() {
-    const searchTerm = document.getElementById('search-clients').value.toLowerCase();
+    const searchEl = document.getElementById('search-clients');
+    const searchTerm = searchEl ? searchEl.value.toLowerCase() : '';
     const filtered = allClients.filter(client =>
         client.name.toLowerCase().includes(searchTerm) ||
         client.email.toLowerCase().includes(searchTerm)
@@ -343,11 +375,13 @@ function openEditClientModal(id, name, email, phone) {
     document.getElementById('edit-client-name').value = name;
     document.getElementById('edit-client-email').value = email;
     document.getElementById('edit-client-phone').value = phone;
-    document.getElementById('edit-client-modal').style.display = 'flex';
+    const modal = document.getElementById('edit-client-modal');
+    if (modal) modal.style.display = 'flex';
 }
 
 function closeEditClientModal() {
-    document.getElementById('edit-client-modal').style.display = 'none';
+    const modal = document.getElementById('edit-client-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 async function updateClient(event) {
@@ -393,6 +427,8 @@ async function loadClientOptions() {
     try {
         const clients = await apiRequest('/api/clients');
         const select = document.getElementById('invoice-client');
+        if (!select) return;
+        
         select.innerHTML = '<option value="">Select a client</option>';
         
         clients.forEach(client => {
@@ -426,7 +462,8 @@ function filterInvoices(status) {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    document.querySelector(`[data-filter="${status}"]`).classList.add('active');
+    const activeBtn = document.querySelector(`[data-filter="${status}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
     
     // Filter invoices
     let filtered = allInvoices;
@@ -439,6 +476,8 @@ function filterInvoices(status) {
 
 function renderInvoices(invoices) {
     const tbody = document.getElementById('invoices-table');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (invoices.length === 0) {
@@ -472,9 +511,10 @@ async function addInvoice(event) {
     
     const client_id = document.getElementById('invoice-client').value;
     const amount = parseFloat(document.getElementById('invoice-amount').value);
-    const description = document.getElementById('invoice-description').value === 'custom'
+    const descSelect = document.getElementById('invoice-description');
+    const description = descSelect.value === 'custom'
         ? document.getElementById('invoice-description-custom').value.trim()
-        : document.getElementById('invoice-description').value;
+        : descSelect.value;
     const due_date = document.getElementById('invoice-due-date').value;
     
     if (!client_id) {
@@ -495,7 +535,8 @@ async function addInvoice(event) {
         });
         
         document.getElementById('add-invoice-form').reset();
-        document.getElementById('invoice-description-custom').style.display = 'none';
+        const customDesc = document.getElementById('invoice-description-custom');
+        if (customDesc) customDesc.style.display = 'none';
         await loadInvoices();
         await loadStats();
         alert('Invoice added successfully!');
@@ -509,11 +550,13 @@ function openEditInvoiceModal(id, amount, description, dueDate) {
     document.getElementById('edit-invoice-amount').value = amount;
     document.getElementById('edit-invoice-description').value = description;
     document.getElementById('edit-invoice-due-date').value = dueDate;
-    document.getElementById('edit-invoice-modal').style.display = 'flex';
+    const modal = document.getElementById('edit-invoice-modal');
+    if (modal) modal.style.display = 'flex';
 }
 
 function closeEditInvoiceModal() {
-    document.getElementById('edit-invoice-modal').style.display = 'none';
+    const modal = document.getElementById('edit-invoice-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 async function updateInvoice(event) {
@@ -604,15 +647,16 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Show custom description field when "Other" is selected
-document.getElementById('invoice-description')?.addEventListener('change', function() {
-    const customField = document.getElementById('invoice-description-custom');
-    if (this.value === 'custom') {
-        customField.style.display = 'block';
-    } else {
-        customField.style.display = 'none';
-    }
-});
+// Show custom description field when "Custom" is selected
+const descSelect = document.getElementById('invoice-description');
+if (descSelect) {
+    descSelect.addEventListener('change', function() {
+        const customField = document.getElementById('invoice-description-custom');
+        if (customField) {
+            customField.style.display = this.value === 'custom' ? 'block' : 'none';
+        }
+    });
+}
 
 // Close modals when clicking outside
 window.onclick = function(event) {
