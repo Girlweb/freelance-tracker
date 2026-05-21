@@ -13,9 +13,9 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 # CORS configuration
 allowed_origins = [
     'http://localhost:8000',
-    'http://localhost:8001',
-    'http://127.0.0.1:8000',
-    'http://127.0.0.1:8001',
+    'http://localhost:5500',
+    'https://freelance-tracker-ao9.pages.dev',
+    os.environ.get('FRONTEND_URL', '')
 ]
 
 frontend_url = os.environ.get('FRONTEND_URL', '')
